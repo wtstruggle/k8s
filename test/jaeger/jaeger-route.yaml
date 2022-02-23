@@ -1,0 +1,34 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: jaeger-route-https
+  namespace: monitoring
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: traefik-cert
+  routes:
+    - match: Host(`test-jaeger.artron.net`)
+      kind: Rule
+      services:
+        - name: jaeger-prod-query
+          port: 16686
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: jaeger-route-http
+  namespace: monitoring
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`test-jaeger.artron.net`)
+      kind: Rule
+      services:
+        - name: jaeger-prod-query
+          port: 16686
+      middlewares:
+        - name: redirect-https
+          namespace: ingress-system

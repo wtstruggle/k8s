@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: es-clean-index-job
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      name: es-clean-index-job
+    spec:
+      containers:
+        - name: job
+          image: centos
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - cd /usr/local;
+              sh /usr/local/clean.sh k8s* 7 ;
+          volumeMounts:
+            - name: es-clean-config
+              mountPath: /usr/local
+      restartPolicy: OnFailure
+      volumes:
+        - name: es-clean-config
+          configMap:
+            name: es-clean-befor-day-config

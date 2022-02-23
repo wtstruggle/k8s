@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: java-service-monitor
+  labels:
+    team: backend
+    language: java
+spec:
+  namespaceSelector:
+    matchNames:
+      - ysw-server
+  selector:
+    matchLabels:
+      tier: backend
+      language: java
+  endpoints:
+    - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      honorLabels: true
+      port: http-metrics
+      path: /artmonitor/prometheus
+      interval: 30s

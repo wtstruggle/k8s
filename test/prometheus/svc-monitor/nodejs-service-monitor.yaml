@@ -1,0 +1,24 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nodejs-service-monitor
+  namespace: monitoring
+  labels:
+    team: frontend
+    language: nodejs
+spec:
+  namespaceSelector:
+    matchNames:
+      - sy-web
+      - ysw-web
+      - sy-server
+      - ysw-server
+  selector:
+    matchLabels:
+      language: nodejs
+  endpoints:
+    - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      honorLabels: true
+      port: http
+      path: /prometheus/metrics
+      interval: 15s

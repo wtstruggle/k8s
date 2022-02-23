@@ -1,0 +1,130 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: logstash-content-audit
+  name: logstash-content-audit
+  namespace: ysw-server
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: logstash-content-audit
+  template:
+    metadata:
+      labels:
+        app: logstash-content-audit
+    spec:
+      containers:
+        - name: logstash
+          image: docker.artron.net/library/logstash:7.10.1
+          args:
+            - --log.level=info
+          env:
+            - name: "XPACK_MONITORING_ENABLED"
+              value: "false"
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1024Mi
+            requests:
+              cpu: 200m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /usr/share/logstash/pipeline/logstash.conf
+              name: config
+              readOnly: true
+              subPath: logstash.conf
+            - name: tz-config
+              mountPath: /etc/localtime
+      volumes:
+        - name: config
+          configMap:
+            name: logstash-content-audit
+        - name: tz-config
+          hostPath:
+            path: /etc/localtime
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-content-audit
+  namespace: ysw-server
+  labels:
+    app: logstash-content-audit
+data:
+  logstash.conf: |-
+    input{
+      stdin{
+      }
+      kafka{
+            bootstrap_servers => ["log-kafka-brokers-svc.monitoring.svc.cluster.local:9092"]
+            auto_offset_reset => "latest"
+            group_id => "content-audit-consumer"
+            consumer_threads => 5
+            decorate_events => "true"
+            topics => ["artron_security_check_record","artron_security_operation_record","artron_security_check_record_log"]
+            codec => "json"
+            decorate_events => "true"
+         }
+    }
+     filter {
+        ruby {
+           code => "event.set('currtimestamp', event.get('@timestamp').time.localtime + 28800)"
+        }
+        ruby {
+           code => "event.set('@timestamp',event.get('currtimestamp'))"
+         }
+        mutate {
+             remove_field => ["currtimestamp"]
+        }
+         if [@metadata][kafka][topic] in "artron_security_check_record" {
+            if [data_source] == 1 {
+              mutate {add_field => { "[@metadata][index]" => "content-audit-%{+YYYY.MM}" }}
+            }else{
+              mutate {add_field => { "[@metadata][index]" => "content-audit-history-%{+YYYY.MM}" }}
+            }
+           mutate {add_field => { "[@metadata][document_id]" => "%{sso_id}" }}
+
+          } else if [@metadata][kafka][topic] in "artron_security_check_record_log" {
+            if [data_source] == 1 {
+              mutate {add_field => { "[@metadata][index]" => "content-audit-log-%{+YYYY.MM}" }}
+            }else{
+              mutate {add_field => { "[@metadata][index]" => "content-audit-history-log-%{+YYYY.MM}" }}
+            }
+            mutate {add_field => { "[@metadata][document_id]" => "%{sso_log_id}" }}
+          }else {
+               mutate {add_field => { "[@metadata][index]" => "content-audit-operation-record" }}
+          }
+     }
+
+
+
+    output{
+    if [@metadata][kafka][topic] in ["artron_security_check_record","artron_security_check_record_log"] {
+      elasticsearch{
+        hosts => ["log-es-svc.monitoring.svc.cluster.local:9200"]
+        action => "update"
+        doc_as_upsert => "true"
+        index => "%{[@metadata][index]}"
+        document_id => "%{[@metadata][document_id]}"
+        document_type => "_doc"
+        user => "elastic"
+        password => "kekw;I15S"
+      }
+     }else{
+      elasticsearch{
+        hosts => ["log-es-svc.monitoring.svc.cluster.local:9200"]
+        doc_as_upsert => "true"
+        index => "%{[@metadata][index]}"
+        document_type => "_doc"
+        user => "elastic"
+        password => "kekw;I15S"
+      }
+    }
+
+    stdout{
+        codec => rubydebug
+    }
+    }

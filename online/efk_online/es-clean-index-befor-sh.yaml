@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: es-clean-befor-day-config
+  namespace: monitoring
+data:
+  clean.sh: |
+    #!/bin/bash
+    prefix=$1
+    day=$2
+    function delete_indices() {
+        format_date=`echo $1| sed 's/-/\./g'`
+       sh ./clean_day_index.sh $prefix $format_date
+    }
+    curl -XGET --user "elastic:kekw;I15S" http://log-es-svc.monitoring.svc.cluster.local:9200/_cat/indices/$prefix | awk -F" " '{print $3}' | awk -F"-" '{print $NF}' | egrep "[0-9]*\.[0-9]*\.[0-9]*" | sort | uniq  | sed 's/\./-/g' | while read LINE_DATE
+    do
+        comp_date=`date -d "$day day ago" +"%Y-%m-%d"`
+
+        date1="$LINE_DATE 00:00:00"
+        date2="$comp_date 00:00:00"
+        t1=`date -d "$date1" +%s`
+        t2=`date -d "$date2" +%s`
+
+        if [ $t1 -le $t2 ]; then
+        delete_indices $LINE_DATE
+        fi
+    done;
+  clean_day_index.sh: |
+    #!/bin/bash
+    prefix=$1
+    day=$2
+    echo $prefix"-"$day""
+      curl    -XGET --user "elastic:kekw;I15S" http://log-es-svc.monitoring.svc.cluster.local:9200/_cat/indices/$prefix$day | awk -F" " '{print $3}' | while read LINE
+        do
+            echo $LINE
+            curl  -v -i -XDELETE --user "elastic:kekw;I15S" http://log-es-svc.monitoring.svc.cluster.local:9200/$LINE
+            echo "-----"
+        done

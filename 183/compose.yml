@@ -1,0 +1,86 @@
+version: "2"
+services:
+  mysql:
+    image: mysql:5.7.23
+    ports:
+      - 0.0.0.0:3306:3306
+    container_name: mysql # 容器名
+#    security_opt:
+#      - seccomp:unconfined
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: 123456
+    volumes: # 挂载 下边每行前边的`-`代表这个东西是数组的一个元素.就是说volumes属性的值是一个数组
+      - /home/sunbaoqing/container_data/mysql/3306/data:/var/lib/mysql
+      - /home/sunbaoqing/container_data/mysql/3306/conf:/etc/mysql/conf.d
+    command: [
+        "--default-time_zone=+8:00"
+    ]
+    networks:
+      - internal_access
+      - monitor
+      - external_access # db access
+  redis:
+    #    restart: always # 容器重启策略
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass 123456
+    volumes:
+      - /home/sunbaoqing/container_data/redis/6379:/data
+    networks:
+      - internal_access
+      - monitor
+      - external_access # db access
+  nginx:
+    image: nginx:1.17-alpine
+    #    restart: always
+    container_name: nginx
+    privileged: true
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /home/sunbaoqing/container_data/nginx/mnt:/usr/share/nginx/html
+      - /home/sunbaoqing/container_data/nginx/conf/conf.d:/etc/nginx/conf.d
+      - /home/sunbaoqing/container_data/nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+      - /home/sunbaoqing/container_data/nginx/log:/var/log/nginx
+      - /home/sunbaoqing/container_data/nginx/cert:/cert
+      - /home/sunbaoqing/container_data/nginx/www:/var/www
+      - /home/sunbaoqing/container_data/nginx/etc/letsencrypt:/etc/letsencrypt
+      - /home/sunbaoqing/container_data/nginx/dsfweb-admin:/var/dsfweb-admin
+    environment:
+      - TZ=Asia/Shanghai
+  zookeeper:
+    image: 'bitnami/zookeeper:latest'
+    container_name: zookeeper
+    ports:
+      - '2181:2181'
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - /home/sunbaoqing/container_data/kafka/secrets:/etc/kafka/secrets
+  kafka:
+    image: 'bitnami/kafka:1.1.1'
+    container_name: kafka
+    ports:
+      - '9092:9092'
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - #部署服务器的IP
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://192.168.64.183:9092
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    volumes:
+     - /home/sunbaoqing/container_data/kafka/secrets:/etc/kafka/secrets
+    depends_on:
+      - zookeeper
+networks:
+  rmq:
+  internal_access:
+    internal: true
+  external_access:
+  monitor:
+    driver: bridge

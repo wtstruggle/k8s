@@ -1,0 +1,70 @@
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+metadata:
+  name: jaeger-prod
+  namespace: monitoring
+spec:
+  strategy: streaming
+  query:
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    replicas: 1
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 10%
+  collector:
+    options:
+      kafka:
+        producer:
+          topic: jaeger-spans
+          brokers: log-kafka-brokers-svc:9092
+          plaintext:
+            username: firstkafka
+            password: 4a-0rgaK.E
+    maxReplicas: 3
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  ingester:
+    replicas: 1
+    maxReplicas: 3
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    options:
+      kafka:
+        consumer:
+          topic: jaeger-spans
+          brokers: log-kafka-brokers-svc:9092
+          plaintext:
+            username: firstkafka
+            password: 4a-0rgaK.E
+      ingester:
+        deadlockInterval: 2m
+  storage:
+    type: elasticsearch
+    options:
+      es:
+        server-urls: http://log-es-svc:9200
+        username: elastic
+        password: kekw;I15S
+    esIndexCleaner:
+      enabled: true
+      numberOfDays: 7
+      schedule: "55 23 * * *"
+  ui:
+    options:
+      dependencies:
+        menuEnabled: true
+      linkPatterns:
+        - type: "tags"
+          key: "traceId"
+          url: https://kibana.artron.net/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:now-15m,to:now))&_a=(columns:!(_source),filters:!(),index:fbc47910-17a6-11ec-9240-cd5ef5c8d37a,interval:auto,query:(language:kuery,query:''),sort:!())&traceId=#{traceId}
+          text: "open es for this trace traceId=#{traceId}"
+  ingress:
+    enabled: false

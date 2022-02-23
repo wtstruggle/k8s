@@ -1,0 +1,30 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-1
+  namespace: sunbaoqing
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`abc.artron.net`) && !PathPrefix(`/java`,`/php`)
+      kind: Rule
+      services:
+        - name: whoami
+          port: 80
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-2
+  namespace: sunbaoqing
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`abc.artron.net`) && PathPrefix(`/java/`)
+      kind: Rule
+      services:
+        - name: java-service
+          port: 8080
+

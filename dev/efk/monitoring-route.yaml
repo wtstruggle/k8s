@@ -1,0 +1,69 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-kibana-route-https
+  namespace: monitoring
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: traefik-cert
+  routes:
+    - match: Host(`dev-kibana.artron.net`)
+      kind: Rule
+      services:
+        - name: kibana
+          port: 5601
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-kibana-route-http
+  namespace: monitoring
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`dev-kibana.artron.net`)
+      kind: Rule
+      services:
+        - name: kibana
+          port: 5601
+      middlewares:
+        - name: redirect-https
+          namespace: ingress-system
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-es-route-https
+  namespace: monitoring
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: traefik-cert
+  routes:
+    - match: Host(`dev-es.artron.net`)
+      kind: Rule
+      services:
+        - name: log-es-svc
+          port: 9200
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-es-route-http
+  namespace: monitoring
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`dev-es.artron.net`)
+      kind: Rule
+      services:
+        - name: log-es-svc
+          port: 9200
+      middlewares:
+        - name: redirect-https
+          namespace: ingress-system

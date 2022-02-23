@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: traefik-service-monitor
+  namespace: monitoring
+  labels:
+    team: backend
+spec:
+  namespaceSelector:
+    matchNames:
+      - ingress-system
+  selector:
+    matchLabels:
+      app: traefik
+  endpoints:
+    - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      honorLabels: true
+      port: metrics
+      path: /metrics

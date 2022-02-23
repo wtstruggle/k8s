@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vue-service-monitor
+  namespace: monitoring
+  labels:
+    team: frontend
+    language: vue
+spec:
+  namespaceSelector:
+    matchNames:
+      - sy-web
+      - ysw-web
+  selector:
+    matchLabels:
+      language: vue
+  endpoints:
+    - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      honorLabels: true
+      port: http-metrics
+      path: /metrics
+      interval: 15s

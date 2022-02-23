@@ -1,0 +1,224 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filebeat-deployment
+  namespace: sunbaoqing
+  labels:
+    business: basics
+    dept: architecture
+    language: java
+    tier: backend
+    release: beat
+    env: test
+    name: filebeat-test
+    app: filebeat-test
+    version: 0.1.0
+  annotations:
+    "sidecar.jaegertracing.io/inject": "false"
+spec:
+  replicas: 1
+  minReadySeconds: 60 #等待设置的时间后才进行升级
+  revisionHistoryLimit: 2 # 保留最近升级的10个版本
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25% #升级过程中最多可以比原先设置多出的POD数量，可设置百分比，不足是向上取整
+      maxUnavailable: 25% #升级过程中最多有多少个POD处于无法提供服务的状态
+  selector:
+    matchLabels:
+      business: basics
+      dept: architecture
+      language: java
+      tier: backend
+      release: beat
+      env: test
+      name: filebeat-test
+      app: filebeat-test
+  template:
+    metadata:
+      labels:
+        business: basics
+        dept: architecture
+        language: java
+        tier: backend
+        release: beat
+        env: test
+        name: filebeat-test
+        app: filebeat-test
+        version: 0.1.0
+      namespace: sunbaoqing
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: filebeat-stdout
+      restartPolicy: Always #重启策略
+      terminationGracePeriodSeconds: 40 #雅关闭的宽限期，即在收到停止请求后;超过这个时间pod会被强制删除
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                  - key: nodeType
+                    operator: In
+                    values:
+                      - test
+              weight: 1
+      containers:
+        - name: java
+          image: docker.artron.net/test/java:71  # 无remark
+          #          image: docker.artron.net/test/java:44  # 有remark
+          securityContext:
+            runAsUser: 0
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 8888
+              name: monitor
+          env:
+            - name: TZ
+              value: Asia/Shanghai
+          livenessProbe: #存活探针,失败会重启服务
+            httpGet:
+              path: /livenessProbe
+              port: 8080
+            initialDelaySeconds: 40  # 延迟探测时间(秒) 【 在k8s第一次探测前等待秒 】
+            failureThreshold: 3 # 不健康阀值
+            successThreshold: 1 # 健康阀值
+            timeoutSeconds: 1 # 超时时间
+            periodSeconds: 10  # 执行探测频率(秒) 【 每隔秒执行一次 】
+          readinessProbe: #就绪探针,若果失败会停止转发service 和网关流量
+            httpGet:
+              path: /readinessProbe
+              port: 8080
+            initialDelaySeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 1
+            periodSeconds: 1
+            failureThreshold: 1
+          startupProbe: #启动探针,startupProbe探测成功后再交给livenessProbe
+            httpGet:
+              path: /livenessProbe
+              port: 8080
+            initialDelaySeconds: 30
+            failureThreshold: 10
+            timeoutSeconds: 1
+            periodSeconds: 5
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - sleep
+                  - "10"
+            preStop: #容器被终止前
+              exec:
+                command:
+                  - sleep
+                  - "10"
+          resources:
+            requests:
+              cpu: "1"
+              ephemeral-storage: "1"
+              dd: "d"
+          volumeMounts:
+            - name: app-logs
+              mountPath: /app/logs
+        - name: centos
+          image: centos:centos7
+          command:
+            - tail
+            - -f
+            - /dev/null
+        - image: elastic/filebeat:7.10.1
+          name: filebeat
+          securityContext:
+            runAsUser: 0
+          args: [
+              "-c", "/etc/filebeat/filebeat.yml",
+              "-e",
+          ]
+          env:
+            - name: pod_ip
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: pod_name
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: labels_app
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app']
+            - name: node_name
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: node_ip
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          resources:
+            limits:
+              cpu: 200m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          volumeMounts:
+            - name: app-logs
+              mountPath: /usr/share/filebeat/app/logs
+            - name: filebeat-config
+              mountPath: /etc/filebeat/
+            - name: tz-config
+              mountPath: /etc/localtime
+
+      volumes:
+        - name: app-logs
+          emptyDir: { }
+        - name: filebeat-config
+          configMap:
+            name: fb-config-java
+        - name: tz-config
+          hostPath:
+            path: /usr/share/zoneinfo/Asia/Shanghai
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-service
+  namespace: sunbaoqing
+  labels:
+    business: basics
+    dept: architecture
+    language: java
+    tier: backend
+    release: beat
+    env: test
+    name: filebeat-test
+    version: 0.1.0
+  annotations:
+    prometheus.io/scrape: "false"
+    prometheus.io/path: "/actuator/prometheus"
+    prometheus.io/scheme: "http"
+    prometheus.io/port: "8080"
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: web
+    - port: 8888
+      targetPort: 8888
+      protocol: TCP
+      name: http-metrics
+  selector:
+    business: basics
+    dept: architecture
+    language: java
+    tier: backend
+    release: beat
+    env: test
+    name: filebeat-test
+

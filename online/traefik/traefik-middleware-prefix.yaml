@@ -1,0 +1,12 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: traefik-stripprefix
+  namespace: ingress-system
+spec:
+  stripPrefix:
+    prefixes:
+      - /prod-api
+      - /apiluckdraw
+      - /wapluckdraw
+      - /pod/v1

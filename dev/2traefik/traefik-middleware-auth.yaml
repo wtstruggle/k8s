@@ -1,0 +1,8 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: user-auth-api
+  namespace: ingress-system
+spec:
+  forwardAuth:
+    address: http://golang-auth-api.ysw-server.svc.cluster.local:8000/api/auth/v1/gateway

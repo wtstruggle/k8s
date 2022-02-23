@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eventrouter
+  namespace: monitoring
+  labels:
+    app: eventrouter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eventrouter
+  template:
+    metadata:
+      labels:
+        app: eventrouter
+        tier: control-plane-addons
+    spec:
+      containers:
+        - name: kube-eventrouter
+          image: docker.artron.net/library/eventrouter:latest
+          command:
+            - "/bin/sh"
+          args:
+            - "-c"
+            - "/app/eventrouter -v 3 -log_dir /data/log/eventrouter"
+          volumeMounts:
+          - name: eventrouter-cm
+            mountPath: /etc/eventrouter
+          - name: app-logs
+            mountPath: /data/log/eventrouter
+          - name: tz-config
+            mountPath: /etc/localtime
+        - image: elastic/filebeat:7.10.1
+          name: filebeat
+          securityContext:
+            runAsUser: 0
+          args: [
+              "-c", "/etc/filebeat/filebeat.yml",
+              "-e",
+          ]
+          env:
+            - name: pod_ip
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: pod_name
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: labels_app
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app']
+            - name: node_name
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: node_ip
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          resources:
+            limits:
+              cpu: 200m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          volumeMounts:
+            - name: app-logs
+              mountPath: /usr/share/filebeat/app/logs
+            - name: filebeat-config
+              mountPath: /etc/filebeat/
+      serviceAccountName: eventrouter
+      volumes:
+        - name: eventrouter-cm
+          configMap:
+            name: eventrouter-cm
+        - name: filebeat-config
+          configMap:
+            name: fb-config-eventrouter
+        - name: tz-config
+          hostPath:
+            path: /usr/share/zoneinfo/Asia/Shanghai
+        - name: app-logs
+          emptyDir: {}

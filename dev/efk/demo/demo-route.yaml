@@ -1,0 +1,39 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-sni-route-https
+  namespace: sunbaoqing
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: traefik-cert
+  routes:
+    - match: Host(`sni.artron.net`,`sni1.artron.net`,`sni2.artron.net`)&& PathPrefix(`/java`)
+      kind: Rule
+      services:
+        - name: java-service
+          port: 8080
+      middlewares:
+        - name: test-errorpage
+          namespace: sunbaoqing
+        - name: chain-base
+          namespace: sunbaoqing
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: traefik-sni-route-http
+  namespace: sunbaoqing
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`sni.artron.net`)&& PathPrefix(`/java`)
+      kind: Rule
+      services:
+        - name: java-service
+          port: 8080
+      middlewares:
+        - name: chain-base
+          namespace: sunbaoqing

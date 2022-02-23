@@ -1,0 +1,21 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: operation-redis-svc
+  namespace: ysw-server
+spec:
+  type: ClusterIP
+  ports:
+    - port: 63790
+      targetPort: 63790
+---
+kind: Endpoints
+apiVersion: v1
+metadata:
+  name: operation-redis-svc
+  namespace: ysw-server
+subsets:
+  - addresses:
+      - ip: 192.168.64.101
+    ports:
+      - port: 63790

@@ -1,0 +1,21 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: operation-mysql-svc
+  namespace: ysw-server
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3309
+      targetPort: 3309
+---
+kind: Endpoints
+apiVersion: v1
+metadata:
+  name: operation-mysql-svc
+  namespace: ysw-server
+subsets:
+  - addresses:
+      - ip: 192.168.64.211
+    ports:
+      - port: 3309

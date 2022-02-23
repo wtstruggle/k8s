@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fb-config-java
+data:
+  filebeat.yml: |
+    filebeat.inputs:
+    - type: log
+      enabled: true
+      fields:
+        index: side-app
+        pod_name: '${pod_name}'
+        pod_ip: '${pod_ip}'
+        node_ip: '${node_ip}'
+        node_name: '${node_name}'
+        labels_app: '${labels_app}'
+        index_prefix: "k8s-${labels_app}-"
+        pipeline: java_log_pipline  ##kafaka使用的es pipeline
+      paths:
+        - "/usr/share/filebeat/app/logs/*.log"
+      multiline.pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+      multiline.negate: true
+      multiline.match: after
+      multiline.timeout: 30
+    setup.kibana:
+      host: "kibana.monitoring.svc.cluster.local:5601"
+    logging.metrics.enabled: false
+    processors:
+      - drop_fields:
+          #删除的多余字段
+          fields: []#["start_time","host", "tags", "ecs",  "prospector", "agent", "input", "beat", "offset","fields.index"]
+          ignore_missing: true
+    ##日志采集后写入kafka
+    output.kafka:
+      enabled: true
+      hosts: ["log-kafka-brokers-svc.monitoring.svc.cluster.local:9092"]
+      topic: filebeat_log
+      required_acks: 1
+      compression: gzip
+      max_message_bytes: 1000000
+#    output.elasticsearch:
+#      # Array of hosts to connect to.
+#      hosts: ["log-es-svc.monitoring.svc.cluster.local:9200"]
+#      # Protocol - either `http` (default) or `https`.
+#      #protocol: "https"
+#
+#      # Authentication credentials - either API key or username/password.
+#      #api_key: "id:api_key"
+#      pipeline: "${pipeline}"
+#      username: "elastic"
+#      password: "art_2021"
+#      indices:
+#        - index: "side-${labels_app}-%{+yyyy.MM.dd}"
+#          when.equals:
+#            fields:
+#              index: "side-app"

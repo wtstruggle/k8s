@@ -1,0 +1,87 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    k8s-app: logstash
+  name: logstash
+  namespace: sunbaoqing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: logstash
+  template:
+    metadata:
+      labels:
+        k8s-app: logstash
+    spec:
+      containers:
+        - name: logstash
+          image: logstash:7.10.1
+          args:
+            - --log.level=info
+          env:
+            - name: "XPACK_MONITORING_ENABLED"
+              value: "false"
+          volumeMounts:
+            - mountPath: /usr/share/logstash/pipeline/logstash.conf
+              name: config
+              readOnly: true
+              subPath: logstash.conf
+            - name: tz-config
+              mountPath: /etc/localtime
+      volumes:
+        - name: config
+          configMap:
+            name: logstash-config
+        - name: tz-config
+          hostPath:
+            path: /usr/share/zoneinfo/Asia/Shanghai
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: sunbaoqing
+  labels:
+    k8s-app: logstash
+data:
+  logstash.conf: |-
+    input{
+      kafka{
+        bootstrap_servers => "log-kafka-brokers-svc.monitoring.svc.cluster.local:9092"
+        topics => ["filebeat_log"]
+        consumer_threads => 1
+        decorate_events => true
+        codec => "json"
+        auto_offset_reset => "latest"
+        }
+    }
+    filter {
+         ruby {
+           code => "event.set('currtimestamp', event.get('@timestamp').time.localtime + 28800)"
+            }
+         ruby {
+           code => "event.set('index_date', event.get('currtimestamp'))"
+           }
+         ruby {
+           code => "event.set('@timestamp',event.get('currtimestamp'))"
+           }
+         mutate {
+           convert => ["index_date", "string"]
+           gsub => ["index_date", "T([\S\s]*?)Z", ""]
+           gsub => ["index_date", "-", "."]
+           }
+          mutate { add_field => { "[fields][push_svc]" => "logstash" } }
+          mutate { add_field => { "[fields][time]" => "%{+yyyy.MM.dd HH:mm:ss}" } }
+        }
+    output{
+      elasticsearch {
+        hosts => ["log-es-svc.monitoring.svc.cluster.local:9200"]
+        index => "%{[fields][index_prefix]}%{index_date}"
+        user => "elastic"
+        password => "art_2021"
+        pipeline => "%{[fields][pipeline]}"
+        }
+    }

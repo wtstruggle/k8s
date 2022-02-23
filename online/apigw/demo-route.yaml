@@ -1,0 +1,32 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: artist-route
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`artistapi.artron.net`)
+      kind: Rule
+      services:
+        - name: tencent-apigw-svc
+          port: 80
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: artist-https
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: traefik-cert
+  routes:
+    - match: Host(`artistapi.artron.net`)
+      kind: Rule
+      services:
+        - name: tencent-apigw-svc
+          port: 80
+      middlewares:
+        - name: redirect-https
+          namespace: ingress-system

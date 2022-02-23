@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: es-clean-config
+  namespace: monitoring
+data:
+  clean.sh: |
+    #!/bin/bash
+    prefix=$1
+    day=$2
+    echo $prefix
+    comp_date=`TZ=UTC-8 date -d "$day day ago" +"%Y.%m.%d"`
+    curl   -XGET --user "elastic:art_2021" http://log-es-svc.monitoring.svc.cluster.local:9200/_cat/indices/$prefix$comp_date | awk -F" " '{print $3}' | while read LINE
+    do
+        echo $LINE
+        curl  -v -i -XDELETE --user "elastic:art_2021" http://log-es-svc.monitoring.svc.cluster.local:9200/$LINE
+        echo "-----"
+    done
+

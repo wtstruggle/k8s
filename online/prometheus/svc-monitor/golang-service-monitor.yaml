@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: golang-service-monitor
+  labels:
+    team: backend
+    language: golang
+spec:
+  namespaceSelector:
+    matchNames:
+      - ysw-server
+  selector:
+    matchLabels:
+      language: golang
+  endpoints:
+    - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      honorLabels: true
+      port: http
+      path: /metrics
+      interval: 15s

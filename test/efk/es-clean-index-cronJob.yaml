@@ -1,0 +1,28 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: es-clean-index
+  namespace: monitoring
+spec:
+  schedule: "30 00 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: cronjob
+              image: centos
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - -c
+                - sh /usr/local/clean.sh k8s* 7;
+                  sh /usr/local/clean.sh side* 7;
+              volumeMounts:
+                - name: es-clean-config
+                  mountPath: /usr/local
+          restartPolicy: OnFailure
+          volumes:
+            - name: es-clean-config
+              configMap:
+                name: es-clean-config

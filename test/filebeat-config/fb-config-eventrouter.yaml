@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fb-config-eventrouter
+  namespace: monitoring
+data:
+  filebeat.yml: |-
+    filebeat.inputs:
+    - type: log
+      enabled: true
+      fields:
+        index: side-app
+        pod_name: '${pod_name}'
+        pod_ip: '${pod_ip}'
+        node_ip: '${node_ip}'
+        node_name: '${node_name}'
+        labels_app: '${labels_app}'
+        index_prefix: "k8s-${labels_app}-"
+        pipeline: "event_log_pipline"
+      paths:
+        - "/usr/share/filebeat/app/logs/*"
+    setup.kibana:
+      host: "kibana.monitoring.svc.cluster.local:5601"
+    logging.metrics.enabled: false
+    processors:
+      - drop_fields:
+          #删除的多余字段
+          fields: ["start_time","host", "tags", "ecs",  "prospector", "agent", "input", "beat", "offset","fields.index"]
+          ignore_missing: true
+    output.kafka:
+      enabled: true
+      hosts: ["log-kafka-brokers-svc.monitoring.svc.cluster.local:9092"]
+      topic: filebeat_log
+      required_acks: 1
+      compression: gzip
+      max_message_bytes: 1000000

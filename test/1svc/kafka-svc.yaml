@@ -1,0 +1,21 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: log-kafka-brokers-svc
+  namespace: monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9092
+      targetPort: 9092
+---
+kind: Endpoints
+apiVersion: v1
+metadata:
+  name: log-kafka-brokers-svc
+  namespace: monitoring
+subsets:
+  - addresses:
+      - ip: 192.168.64.108
+    ports:
+      - port: 9092
